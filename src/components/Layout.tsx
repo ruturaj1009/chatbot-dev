@@ -28,22 +28,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             
             <div className="flex items-center space-x-4">
               {/* Quick Action Buttons */}
-              <div className="hidden sm:flex items-center space-x-2">
-                <Link
-                  to="/profile"
-                  className="flex items-center space-x-2 px-3 py-2 bg-primary-600 text-white rounded-md text-sm font-medium hover:bg-primary-700 transition-colors duration-200"
-                >
-                  <Plus size={16} />
-                  <span>Add Profile</span>
-                </Link>
-                <Link
-                  to="/jobs"
-                  className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 transition-colors duration-200"
-                >
-                  <Plus size={16} />
-                  <span>Post Job</span>
-                </Link>
-              </div>
+              
 
               {/* Navigation */}
               <nav className="flex space-x-8">
@@ -64,25 +49,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 ))}
               </nav>
             </div>
+            
           </div>
           
           {/* Mobile Quick Actions */}
-          <div className="sm:hidden pb-3 flex space-x-2">
-            <Link
-              to="/profile"
-              className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 bg-primary-600 text-white rounded-md text-sm font-medium hover:bg-primary-700 transition-colors duration-200"
-            >
-              <Plus size={16} />
-              <span>Add Profile</span>
-            </Link>
-            <Link
-              to="/jobs"
-              className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 transition-colors duration-200"
-            >
-              <Plus size={16} />
-              <span>Post Job</span>
-            </Link>
-          </div>
+          
         </div>
       </header>
       <main className="flex-1">

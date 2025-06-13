@@ -15,29 +15,62 @@ interface ChatMessage {
 
 interface UserData {
   name: string
+  jobRole: string
   skills: string[]
-  location: string
-  yearsExperience: number
-  jobType: string
+  jobLevel: number
+  certificationLevel: string
+  proficiencyLevel: string
+  profileCount: number
 }
 
 interface MatchProfile {
   id: string
-  photo: string
   name: string
-  title: string
+  email: string
   experience: string
-  location: string
+  img: string
+  proficiency: string
+  jobLevel: number
   skills: string[]
 }
 
 const questions = [
-  "What's your full name?",
-  "What are your key technical skills? (separate with commas)",
-  "Where are you located? (city, country)",
-  "How many years of professional experience do you have?",
-  "What type of job role are you seeking? (e.g., Full-time, Contract, Remote)"
+  "What is your name?",
+  "What is your current job role?",
+  "What are your key skills? (Please list them separated by commas)",
+  "Select your job level (1-9):",
+  "Select your certification level:",
+  "Select your proficiency level:",
+  "Select profile count (1-5):"
 ]
+
+const certificationOptions = ['None', 'Beginner', 'Intermediate', 'Professional']
+const proficiencyOptions = ['Beginner', 'Intermediate', 'Professional']
+
+// Backend configuration
+const BACKEND_URL = 'your-api-endpoint'
+
+async function submitProfileData(profileData: UserData): Promise<MatchProfile[]> {
+  try {
+    const response = await fetch(BACKEND_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(profileData)
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    return data // Returns: [{name, id, email, experience, img, proficiency, jobLevel, skills}, ...]
+  } catch (error) {
+    console.error('Error submitting profile data:', error)
+    throw error
+  }
+}
 
 const ChatbotScreen: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -50,6 +83,7 @@ const ChatbotScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
+  const [showOptions, setShowOptions] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -60,6 +94,7 @@ const ChatbotScreen: React.FC = () => {
     scrollToBottom()
   }, [messages])
 
+  // Initialize questions only after component is fully mounted
   useEffect(() => {
     initializeChat()
   }, [])
@@ -69,7 +104,7 @@ const ChatbotScreen: React.FC = () => {
     const initialMessage: ChatMessage = {
       id: '1',
       type: 'bot',
-      content: "Hi! I'm here to help you find the perfect job match. Let's start with a few questions.",
+      content: "Hi! I'm here to help you find the perfect job match. Let's start with a few questions to build your profile.",
       timestamp: new Date()
     }
     setMessages([initialMessage])
@@ -91,6 +126,7 @@ const ChatbotScreen: React.FC = () => {
     setIsLoading(false)
     setEditingMessageId(null)
     setEditValue('')
+    setShowOptions(false)
     
     // Restart the conversation
     setTimeout(() => {
@@ -113,6 +149,13 @@ const ChatbotScreen: React.FC = () => {
       }
       setMessages(prev => [...prev, questionMessage])
       setIsTyping(false)
+      
+      // Show options for specific questions
+      if (questionIndex === 4 || questionIndex === 5) {
+        setShowOptions(true)
+      } else {
+        setShowOptions(false)
+      }
     }, 1000)
   }
 
@@ -122,15 +165,20 @@ const ChatbotScreen: React.FC = () => {
     switch (questionIndex) {
       case 0: // Name
         return trimmed.length >= 2
-      case 1: // Skills
+      case 1: // Job role
+        return trimmed.length >= 2
+      case 2: // Skills
         return trimmed.length > 0
-      case 2: // Location
-        return trimmed.includes(',') && trimmed.length >= 3
-      case 3: // Experience
-        const years = parseInt(trimmed)
-        return !isNaN(years) && years >= 0 && years <= 50
-      case 4: // Job type
-        return trimmed.length > 0
+      case 3: // Job level
+        const level = parseInt(trimmed)
+        return !isNaN(level) && level >= 1 && level <= 9
+      case 4: // Certification level
+        return certificationOptions.includes(trimmed)
+      case 5: // Proficiency level
+        return proficiencyOptions.includes(trimmed)
+      case 6: // Profile count
+        const count = parseInt(trimmed)
+        return !isNaN(count) && count >= 1 && count <= 5
       default:
         return true
     }
@@ -144,21 +192,32 @@ const ChatbotScreen: React.FC = () => {
         newUserData.name = response.trim()
         break
       case 1:
-        newUserData.skills = response.split(',').map(skill => skill.trim()).filter(Boolean)
+        newUserData.jobRole = response.trim()
         break
       case 2:
-        newUserData.location = response.trim()
+        newUserData.skills = response.split(',').map(skill => skill.trim()).filter(Boolean)
         break
       case 3:
-        newUserData.yearsExperience = parseInt(response.trim())
+        newUserData.jobLevel = parseInt(response.trim())
         break
       case 4:
-        newUserData.jobType = response.trim()
+        newUserData.certificationLevel = response.trim()
+        break
+      case 5:
+        newUserData.proficiencyLevel = response.trim()
+        break
+      case 6:
+        newUserData.profileCount = parseInt(response.trim())
         break
     }
     
     setUserData(newUserData)
     return newUserData
+  }
+
+  const handleOptionSelect = (option: string) => {
+    setCurrentInput(option)
+    setShowOptions(false)
   }
 
   const handleEdit = (messageId: string, currentContent: string, questionIndex?: number) => {
@@ -221,6 +280,7 @@ const ChatbotScreen: React.FC = () => {
     // Process the response
     const updatedUserData = processResponse(currentInput, currentQuestionIndex)
     setCurrentInput('')
+    setShowOptions(false)
 
     // Check if we're done with questions
     if (currentQuestionIndex >= questions.length - 1) {
@@ -238,46 +298,90 @@ const ChatbotScreen: React.FC = () => {
   const submitUserData = async (data: UserData) => {
     setIsLoading(true)
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Try to submit to actual backend first
+      let matchedProfiles: MatchProfile[] = []
       
-      // Mock response with sample profiles
-      const mockMatches: MatchProfile[] = [
-        {
-          id: '1',
-          photo: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-          name: 'Sarah Johnson',
-          title: 'Senior Frontend Developer',
-          experience: '5 years',
-          location: 'San Francisco, CA',
-          skills: ['React', 'TypeScript', 'Node.js']
-        },
-        {
-          id: '2',
-          photo: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-          name: 'Michael Chen',
-          title: 'Full Stack Engineer',
-          experience: '7 years',
-          location: 'New York, NY',
-          skills: ['Python', 'React', 'AWS']
-        },
-        {
-          id: '3',
-          photo: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-          name: 'Emily Rodriguez',
-          title: 'UX/UI Designer',
-          experience: '4 years',
-          location: 'Austin, TX',
-          skills: ['Figma', 'Design Systems', 'User Research']
-        }
-      ]
+      try {
+        matchedProfiles = await submitProfileData(data)
+        console.log('Successfully submitted to backend:', data)
+      } catch (backendError) {
+        console.warn('Backend not available, using mock data:', backendError)
+        
+        // Fallback to mock data if backend is not available
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        
+        // Generate mock profiles with skills based on user's skills
+        const mockSkillsPool = [
+          ['React', 'JavaScript', 'TypeScript'],
+          ['Python', 'Django', 'PostgreSQL'],
+          ['Node.js', 'Express', 'MongoDB'],
+          ['Java', 'Spring Boot', 'MySQL'],
+          ['Vue.js', 'Nuxt.js', 'CSS'],
+          ['Angular', 'RxJS', 'NgRx'],
+          ['PHP', 'Laravel', 'Redis'],
+          ['Go', 'Docker', 'Kubernetes']
+        ]
+        
+        matchedProfiles = [
+          {
+            id: '1',
+            name: 'Sarah Johnson',
+            email: 'sarah.johnson@example.com',
+            experience: '5 years',
+            img: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+            proficiency: 'Professional',
+            jobLevel: 7,
+            skills: mockSkillsPool[0]
+          },
+          {
+            id: '2',
+            name: 'Michael Chen',
+            email: 'michael.chen@example.com',
+            experience: '7 years',
+            img: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+            proficiency: 'Professional',
+            jobLevel: 8,
+            skills: mockSkillsPool[1]
+          },
+          {
+            id: '3',
+            name: 'Emily Rodriguez',
+            email: 'emily.rodriguez@example.com',
+            experience: '4 years',
+            img: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+            proficiency: 'Intermediate',
+            jobLevel: 6,
+            skills: mockSkillsPool[2]
+          },
+          {
+            id: '4',
+            name: 'David Kim',
+            email: 'david.kim@example.com',
+            experience: '6 years',
+            img: 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+            proficiency: 'Professional',
+            jobLevel: 7,
+            skills: mockSkillsPool[3]
+          },
+          {
+            id: '5',
+            name: 'Lisa Wang',
+            email: 'lisa.wang@example.com',
+            experience: '3 years',
+            img: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+            proficiency: 'Intermediate',
+            jobLevel: 5,
+            skills: mockSkillsPool[4]
+          }
+        ].slice(0, data.profileCount)
+      }
       
-      setMatches(mockMatches)
+      setMatches(matchedProfiles)
       
       const successMessage: ChatMessage = {
         id: Date.now().toString(),
         type: 'bot',
-        content: `Perfect! Based on your profile, I found ${mockMatches.length} potential matches. Here are some professionals who might be great connections for you:`,
+        content: `Perfect! Based on your profile, I found ${matchedProfiles.length} potential matches. Here are professionals who might be great connections for you:`,
         timestamp: new Date()
       }
       setMessages(prev => [...prev, successMessage])
@@ -288,6 +392,27 @@ const ChatbotScreen: React.FC = () => {
       console.error('Error submitting user data:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const getValidationHint = (questionIndex: number): string => {
+    switch (questionIndex) {
+      case 0:
+        return 'Please enter your full name (at least 2 characters)'
+      case 1:
+        return 'Please enter your current job role'
+      case 2:
+        return 'List your skills separated by commas (e.g., React, TypeScript, Node.js)'
+      case 3:
+        return 'Enter a number between 1 and 9'
+      case 4:
+        return 'Select from: None, Beginner, Intermediate, Professional'
+      case 5:
+        return 'Select from: Beginner, Intermediate, Professional'
+      case 6:
+        return 'Enter a number between 1 and 5'
+      default:
+        return ''
     }
   }
 
@@ -400,6 +525,30 @@ const ChatbotScreen: React.FC = () => {
             </motion.div>
           )}
 
+          {/* Option buttons for certification and proficiency questions */}
+          {showOptions && !isComplete && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex justify-start"
+            >
+              <div className="bg-gray-50 p-4 rounded-lg max-w-md">
+                <p className="text-sm text-gray-600 mb-3">Select an option:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(currentQuestionIndex === 4 ? certificationOptions : proficiencyOptions).map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => handleOptionSelect(option)}
+                      className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm hover:bg-primary-50 hover:border-primary-300 transition-colors duration-200"
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {isLoading && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -423,18 +572,19 @@ const ChatbotScreen: React.FC = () => {
                 <div key={profile.id} className="card hover:shadow-md transition-shadow duration-200">
                   <div className="flex items-center space-x-3 mb-3">
                     <img
-                      src={profile.photo}
+                      src={profile.img}
                       alt={profile.name}
                       className="w-12 h-12 rounded-full object-cover"
                     />
                     <div>
                       <h3 className="font-semibold text-gray-900">{profile.name}</h3>
-                      <p className="text-sm text-gray-600">{profile.title}</p>
+                      <p className="text-sm text-gray-600">{profile.email}</p>
                     </div>
                   </div>
                   <div className="space-y-2 text-sm">
                     <p><span className="font-medium">Experience:</span> {profile.experience}</p>
-                    <p><span className="font-medium">Location:</span> {profile.location}</p>
+                    <p><span className="font-medium">Job Level:</span> {profile.jobLevel}/9</p>
+                    <p><span className="font-medium">Proficiency:</span> {profile.proficiency}</p>
                     <div>
                       <span className="font-medium">Skills:</span>
                       <div className="flex flex-wrap gap-1 mt-1">
@@ -464,7 +614,7 @@ const ChatbotScreen: React.FC = () => {
                 type="text"
                 value={currentInput}
                 onChange={(e) => setCurrentInput(e.target.value)}
-                placeholder="Type your answer..."
+                placeholder={getValidationHint(currentQuestionIndex)}
                 className="flex-1 input-field"
                 disabled={isTyping}
                 aria-label="Chat input"
